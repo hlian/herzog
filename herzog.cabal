@@ -12,10 +12,19 @@ cabal-version:       >=1.10
 
 executable herzog
   main-is:             Main.hs
-  build-depends:       base >=4.7 && <4.8
+  build-depends:       aeson
+                     , base >=4.7 && <4.8
                      , base-prelude
+                     , bytestring >= 0.10.4.0
+                     , http-types
                      , lucid
+                     , mtl >= 2.1.3.1
                      , process
+                     , text
+                     , text-locale-encoding
+                     , wai >= 3.0.2.2
                      , warp
   hs-source-dirs:      src
   default-language:    Haskell2010
+  extensions:          NoImplicitPrelude
+                     , OverloadedStrings
