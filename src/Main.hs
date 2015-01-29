@@ -55,5 +55,5 @@ main :: IO ()
 main = do
   args <- Env.getArgs
   let port = read (head args)
-  let key = read (args !! 1)
+  let key = Text.pack (args !! 1)
   main' port key
