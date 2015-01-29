@@ -120,4 +120,4 @@ hmacSha1 key message =
 
 gitPull :: Text -> IO Text
 gitPull path =
-  shell ["git", "-C", path, "pullasdf"] Nothing
+  shell ["git", "-C", path, "pull"] Nothing

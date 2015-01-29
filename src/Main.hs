@@ -11,28 +11,33 @@ import qualified System.Environment as Env
 import BasePrelude hiding (app, log)
 import Utils
 
-log :: String -> IO ()
-log = putStrLn
+log :: Text -> IO ()
+log = putStrLn . Text.unpack
 
-app :: Text -> Application
-app key req respond =
+app :: Text -> IO () -> Application
+app key tick req respond =
   case pathInfo req of
    ["hook"] -> do
      bytes <- requestBytes req
      hmac <- lift (hmacSha1 key bytes)
      if Just hmac == requestSignature req then
-        respond (respondText status200 [] "ok")
+       lift tick >>
+       respond (respondText status200 [] "ok")
      else
-        respond (respondText status400 [] "Invalid HMAC")
+       respond (respondText status400 [] "Invalid HMAC")
 
-main' :: Int -> Text -> IO ()
-main' port key = do
-  log ("+ Listening on port " <> show port)
-  run port (safely $ app key)
+main' :: Int -> Text -> Text -> IO ()
+main' port key db = do
+  log ("+ Listening on port " <> present port)
+  run port (safely $ app key tick)
+  where
+    tick = void (gitPull db)
 
 main :: IO ()
 main = do
   args <- Env.getArgs
   let port = read (head args)
   let key = Text.pack (args !! 1)
-  main' port key
+  let db = Text.pack (args !! 2)
+  log ("+ DB " <> db)
+  main' port key db
