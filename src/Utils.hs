@@ -1,6 +1,7 @@
 module Utils (
   Application
 , ApplicationM
+, hmacSha1
 , lift
 , present
 , respondText
@@ -12,14 +13,18 @@ module Utils (
 
 import Data.ByteString (ByteString)
 import Data.Text (Text)
+import Data.Text.Encoding.Locale (decodeLocale)
+import System.Process (CreateProcess(..))
 
 import qualified Data.Aeson as A
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Network.Wai as W
+import qualified System.Process as P
 
 import BasePrelude hiding (app)
 import Control.Monad.Error
@@ -77,3 +82,20 @@ safely app req respond = do
 
 present :: Show a => a -> Text
 present = T.pack . show
+
+hmacSha1 :: Text -> ByteString -> IO Text
+hmacSha1 key message =
+  bracket acquire release hmacOf'
+  where
+    acquire =
+      P.createProcess builder
+    release (Just hin, Just hout, _, _) =
+      hClose hin >> hClose hout
+    hmacOf' (Just hin, Just hout, _, _) = do
+      B.hPut hin message
+      hClose hin
+      T.strip <$> (B.hGetContents hout >>= decodeLocale)
+    builder0 =
+      P.proc "openssl" ["sha1", "-hmac", T.unpack key]
+    builder =
+      builder0 { std_in = P.CreatePipe, std_out = P.CreatePipe }
