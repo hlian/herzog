@@ -2,6 +2,7 @@ module Utils (
   Application
 , ApplicationM
 , hmacSha1
+, gitPull
 , lift
 , present
 , respondText
@@ -26,7 +27,7 @@ import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Network.Wai as W
 import qualified System.Process as P
 
-import BasePrelude hiding (app)
+import BasePrelude hiding (app, assert)
 import Control.Monad.Error
 import Network.HTTP.Types
 
@@ -83,19 +84,40 @@ safely app req respond = do
 present :: Show a => a -> Text
 present = T.pack . show
 
-hmacSha1 :: Text -> ByteString -> IO Text
-hmacSha1 key message =
-  bracket acquire release hmacOf'
+unsafeGetContents :: Handle -> P.ProcessHandle -> Text -> IO ByteString
+unsafeGetContents hout hproc tag = do
+  contents <- B.hGetContents hout
+  code <- P.waitForProcess hproc
+  case code of
+   ExitSuccess ->
+     return contents
+   ExitFailure i ->
+     (error . T.unpack . msg) i
+  where
+    msg i =
+      "shell: exit code " <> present i <> ": " <> tag
+
+shell :: [Text] -> Maybe ByteString -> IO Text
+shell args_ stdinM =
+  T.strip <$> (decodeLocale =<< bracket acquire release readOut)
   where
     acquire =
       P.createProcess builder
-    release (Just hin, Just hout, _, _) =
-      hClose hin >> hClose hout
-    hmacOf' (Just hin, Just hout, _, _) = do
-      B.hPut hin message
+    release (Just hin, Just hout, _, _) = do
       hClose hin
-      T.strip <$> (B.hGetContents hout >>= decodeLocale)
-    builder0 =
-      P.proc "openssl" ["sha1", "-hmac", T.unpack key]
-    builder =
-      builder0 { std_in = P.CreatePipe, std_out = P.CreatePipe }
+      hClose hout
+    readOut (Just hin, Just hout, _, hproc) = do
+      maybe (return ()) (B.hPut hin) stdinM
+      hClose hin
+      unsafeGetContents hout hproc (present args_)
+    builder0 = P.proc (head args) (tail args)
+    builder = builder0 { std_in = P.CreatePipe, std_out = P.CreatePipe, std_err = P.CreatePipe }
+    args = T.unpack <$> args_
+
+hmacSha1 :: Text -> ByteString -> IO Text
+hmacSha1 key message =
+  shell ["openssl", "sha1", "-hmac", key] (Just message)
+
+gitPull :: Text -> IO Text
+gitPull path =
+  shell ["git", "-C", path, "pullasdf"] Nothing
