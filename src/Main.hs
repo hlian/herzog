@@ -31,7 +31,10 @@ main' port key db = do
   log ("+ Listening on port " <> present port)
   run port (safely $ app key tick)
   where
-    tick = void (gitPull db)
+    tick = do
+      gitPull db
+      public <- buildPublic db
+      promotePublic db public
 
 main :: IO ()
 main = do

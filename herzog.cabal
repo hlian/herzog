@@ -16,12 +16,14 @@ executable herzog
                      , base >=4.7 && <4.8
                      , base-prelude
                      , bytestring >= 0.10.4.0
+                     , filepath >= 1.3.0.2
                      , http-types
                      , lucid
                      , mtl >= 2.1.3.1
                      , process
                      , text
                      , text-locale-encoding
+                     , time >= 1.4.2
                      , wai >= 3.0.2.2
                      , warp
   hs-source-dirs:      src

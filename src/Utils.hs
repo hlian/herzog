@@ -1,10 +1,12 @@
 module Utils (
   Application
 , ApplicationM
+, buildPublic
 , hmacSha1
 , gitPull
 , lift
 , present
+, promotePublic
 , respondText
 , requestBody
 , requestBytes
@@ -24,17 +26,24 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Time.Calendar as Calendar
+import qualified Data.Time.Clock as Clock
 import qualified Network.Wai as W
+import qualified System.FilePath.Posix as FilePath
 import qualified System.Process as P
 
 import BasePrelude hiding (app, assert)
 import Control.Monad.Error
 import Network.HTTP.Types
 
-data HTTPError = HTTPError Status Text
+data HTTPError =
+  HTTPError Status Text
 
 instance Error HTTPError where
   strMsg = HTTPError status500 . T.pack
+
+newtype Public =
+  Public Text
 
 type ApplicationM =
   ErrorT HTTPError IO
@@ -121,3 +130,24 @@ hmacSha1 key message =
 gitPull :: Text -> IO Text
 gitPull path =
   shell ["git", "-C", path, "pull"] Nothing
+
+measureDate :: IO (Integer, Integer, Integer, Text)
+measureDate = do
+  Clock.UTCTime date time <- Clock.getCurrentTime
+  let (year, month, day) = Calendar.toGregorian date
+  return (year, fromIntegral month, fromIntegral day, present time)
+
+slash :: [Text] -> Text
+slash = T.pack . FilePath.joinPath . fmap T.unpack
+
+buildPublic :: Text -> IO Public
+buildPublic db = do
+  (year, month, day, time) <- measureDate
+  let key = present year <> "-" <> present month <> "-" <> present day <> "-" <> time
+  shell ["mkdir", slash [db, "public-" <> key]] Nothing
+  return (Public key)
+
+promotePublic :: Text -> Public -> IO ()
+promotePublic db (Public key) = do
+  shell ["ln", "-sf", slash [db, "public-" <> key], slash [db, "public"]] Nothing
+  return ()
